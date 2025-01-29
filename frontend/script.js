@@ -84,7 +84,10 @@ async function deleteCat(id) {
 
 // Edit cat modal functions
 function openEditModal(cat) {
-    document.getElementById('editModal').classList.remove('hidden');
+    const modal = document.getElementById('editModal');
+    modal.style.display = 'block';  // Use style.display instead of classList
+    
+    // Fill in the form fields
     document.getElementById('editCatId').value = cat.id;
     document.getElementById('editName').value = cat.name;
     document.getElementById('editBreed').value = cat.breed;
@@ -93,7 +96,16 @@ function openEditModal(cat) {
 }
 
 function closeEditModal() {
-    document.getElementById('editModal').classList.add('hidden');
+    const modal = document.getElementById('editModal');
+    modal.style.display = 'none';  // Use style.display instead of classList
+}
+
+// Add click outside modal to close
+window.onclick = function(event) {
+    const modal = document.getElementById('editModal');
+    if (event.target === modal) {
+        closeEditModal();
+    }
 }
 
 // Edit cat form submission
