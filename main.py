@@ -1,5 +1,47 @@
 # main.py
-from fastapi import Request
+from fastapi import FastAPI, HTTPException, Depends, Request
+from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import create_engine
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy import Column, Integer, String, Float
+from pydantic import BaseModel
+from typing import List, Optional
+
+# Database configuration
+SQLALCHEMY_DATABASE_URL = "sqlite:///./cats.db"
+engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+
+# Cat SQLAlchemy Model
+class CatDB(Base):
+    __tablename__ = "cats"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, index=True)
+    breed = Column(String)
+    age = Column(Float)
+    weight = Column(Float)
+
+# Cat Pydantic Models
+class CatBase(BaseModel):
+    name: str
+    breed: str
+    age: float
+    weight: float
+
+class CatCreate(CatBase):
+    pass
+
+class Cat(CatBase):
+    id: int
+    
+    class Config:
+        orm_mode = True
+
+# Create tables
+Base.metadata.create_all(bind=engine)
 
 def get_client_ip(request: Request) -> str:
     """
@@ -19,6 +61,25 @@ def get_client_ip(request: Request) -> str:
     
     # If no proxy headers, use the direct client IP
     return request.client.host if request.client else "Unknown"
+
+# Dependency to get DB session
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+# Initialize FastAPI app
+app = FastAPI(title="Cats API")
+
+# Configure CORS
+origins = [
+    "https://nimlordia.github.io",
+    # Add localhost for testing if needed
+    "http://localhost:3000",
+    "http://127.0.0.1:3000"
+]
 
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
@@ -63,7 +124,7 @@ async def log_requests(request: Request, call_next):
         """)
         raise
 
-# Update CRUD operations to include IP logging
+# CRUD Operations
 @app.post("/cats/")
 async def create_cat(cat: CatCreate, request: Request, db: Session = Depends(get_db)):
     client_ip = get_client_ip(request)
@@ -108,3 +169,8 @@ async def delete_cat(cat_id: int, request: Request, db: Session = Depends(get_db
     except Exception as e:
         logger.error(f"Error deleting cat {cat_id} from IP {client_ip}: {str(e)}")
         raise
+
+# Run the application
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
