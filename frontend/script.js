@@ -1,28 +1,62 @@
+// API and Axios Configuration
 const API_URL = 'https://catscrudrender.onrender.com';
 
-// Configure axios defaults
-axios.defaults.baseURL = API_URL;
-axios.defaults.headers.common['Content-Type'] = 'application/json';
-axios.defaults.headers.common['Accept'] = 'application/json';
-axios.defaults.withCredentials = false; // Set this to false since we're making cross-origin requests
-// Fetch all cats
-async function fetchCats() {
-    try {
-        const response = await axios.get('/cats/');
-        displayCats(response.data);
-    } catch (error) {
-        console.error('Error fetching cats:', error);
-        alert('Error fetching cats: ' + (error.response?.data?.detail || error.message));
-    }
-}
+// Create axios instance with default configuration
+const axiosInstance = axios.create({
+    baseURL: API_URL,
+    headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+    },
+    withCredentials: false
+});
 
-axios.interceptors.response.use(
-    response => response,
+// Add a request interceptor
+axiosInstance.interceptors.request.use(
+    config => {
+        // You could add loading state here
+        document.body.style.cursor = 'wait';
+        return config;
+    },
     error => {
-        console.error('Request Error:', error.response?.data || error.message);
+        document.body.style.cursor = 'default';
         return Promise.reject(error);
     }
 );
+
+// Add a response interceptor
+axiosInstance.interceptors.response.use(
+    response => {
+        document.body.style.cursor = 'default';
+        return response;
+    },
+    error => {
+        document.body.style.cursor = 'default';
+        console.error('API Error:', {
+            status: error.response?.status,
+            data: error.response?.data,
+            message: error.message
+        });
+        return Promise.reject(error);
+    }
+);
+
+// Fetch all cats
+async function fetchCats() {
+    try {
+        const response = await axiosInstance.get('/cats/');
+        displayCats(response.data);
+    } catch (error) {
+        handleError('fetching', error);
+    }
+}
+
+// Error handler function
+function handleError(action, error) {
+    const errorMessage = error.response?.data?.detail || error.message;
+    console.error(`Error ${action} cat:`, error);
+    alert(`Error ${action} cat: ${errorMessage}`);
+}
 
 // Display cats in table
 function displayCats(cats) {
@@ -33,8 +67,8 @@ function displayCats(cats) {
         const row = document.createElement('tr');
         row.innerHTML = `
             <td>${cat.id}</td>
-            <td>${cat.name}</td>
-            <td>${cat.breed}</td>
+            <td>${escapeHtml(cat.name)}</td>
+            <td>${escapeHtml(cat.breed)}</td>
             <td>${cat.age}</td>
             <td>${cat.weight}</td>
             <td>
@@ -46,6 +80,13 @@ function displayCats(cats) {
         `;
         tableBody.appendChild(row);
     });
+}
+
+// HTML escape function for security
+function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
 }
 
 // Add new cat
@@ -60,12 +101,11 @@ document.getElementById('addCatForm').addEventListener('submit', async (e) => {
     };
 
     try {
-        await axios.post('/cats/', catData);
+        await axiosInstance.post('/cats/', catData);
         e.target.reset();
         fetchCats();
     } catch (error) {
-        console.error('Error adding cat:', error);
-        alert('Error adding cat: ' + (error.response?.data?.detail || error.message));
+        handleError('adding', error);
     }
 });
 
@@ -73,11 +113,10 @@ document.getElementById('addCatForm').addEventListener('submit', async (e) => {
 async function deleteCat(id) {
     if (confirm('Are you sure you want to delete this cat?')) {
         try {
-            await axios.delete(`/cats/${id}`);
+            await axiosInstance.delete(`/cats/${id}`);
             fetchCats();
         } catch (error) {
-            console.error('Error deleting cat:', error);
-            alert('Error deleting cat: ' + (error.response?.data?.detail || error.message));
+            handleError('deleting', error);
         }
     }
 }
@@ -85,7 +124,7 @@ async function deleteCat(id) {
 // Edit cat modal functions
 function openEditModal(cat) {
     const modal = document.getElementById('editModal');
-    modal.style.display = 'block';  // Use style.display instead of classList
+    modal.style.display = 'block';
     
     // Fill in the form fields
     document.getElementById('editCatId').value = cat.id;
@@ -97,10 +136,10 @@ function openEditModal(cat) {
 
 function closeEditModal() {
     const modal = document.getElementById('editModal');
-    modal.style.display = 'none';  // Use style.display instead of classList
+    modal.style.display = 'none';
 }
 
-// Add click outside modal to close
+// Modal click outside to close
 window.onclick = function(event) {
     const modal = document.getElementById('editModal');
     if (event.target === modal) {
@@ -120,12 +159,18 @@ document.getElementById('editCatForm').addEventListener('submit', async (e) => {
     };
 
     try {
-        await axios.put(`/cats/${id}`, catData);
+        await axiosInstance.put(`/cats/${id}`, catData);
         closeEditModal();
         fetchCats();
     } catch (error) {
-        console.error('Error updating cat:', error);
-        alert('Error updating cat: ' + (error.response?.data?.detail || error.message));
+        handleError('updating', error);
+    }
+});
+
+// Keyboard support for modal
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        closeEditModal();
     }
 });
 

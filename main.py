@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 SQLALCHEMY_DATABASE_URL = "sqlite:///./cats.db"
 engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
 # Define Base class for SQLAlchemy models
 class Base(DeclarativeBase):
     pass
@@ -48,7 +49,7 @@ class Cat(CatBase):
     id: int
     
     class Config:
-        from_attributes = True  # Updated from orm_mode
+        from_attributes = True
 
 # Create tables
 Base.metadata.create_all(bind=engine)
@@ -81,21 +82,39 @@ app = FastAPI(title="Cats API")
 # Configure CORS
 origins = [
     "https://nimlordia.github.io",
+    "https://catmanager.netlify.app",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
-    "http://0.0.0.0:8000",
-    "http://0.0.0.0:5500",
-    "https://catmanager.netlify.app/"
+    "http://localhost:5500",
+    "http://127.0.0.1:5500"
 ]
 
+# Add CORS middleware first, before any routes
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["*"],
+    max_age=3600,
 )
 
+# Add debug middleware to log CORS headers
+@app.middleware("http")
+async def debug_cors(request: Request, call_next):
+    response = await call_next(request)
+    
+    logger.info(f"""
+    CORS Debug:
+    - Origin: {request.headers.get('origin', 'No Origin')}
+    - Request Method: {request.method}
+    - Response Headers: {dict(response.headers)}
+    """)
+    
+    return response
+
+# Request logging middleware
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     start_time = time.time()
@@ -132,6 +151,11 @@ async def log_requests(request: Request, call_next):
         - Method: {request.method}
         """)
         raise
+
+# Health check endpoint
+@app.get("/")
+async def root():
+    return {"status": "healthy", "timestamp": datetime.now().isoformat()}
 
 # CRUD Operations
 @app.post("/cats/", response_model=Cat)
@@ -208,4 +232,5 @@ async def delete_cat(cat_id: int, request: Request, db: Session = Depends(get_db
 
 if __name__ == "__main__":
     import uvicorn
+    logger.info("Starting FastAPI application")
     uvicorn.run(app, host="0.0.0.0", port=8000)
