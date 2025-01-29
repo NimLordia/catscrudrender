@@ -3,7 +3,6 @@ const API_URL = 'https://catscrudrender.onrender.com';
 // Configure axios defaults
 axios.defaults.baseURL = API_URL;
 axios.defaults.headers.post['Content-Type'] = 'application/json';
-
 // Fetch all cats
 async function fetchCats() {
     try {
