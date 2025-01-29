@@ -2,7 +2,9 @@ const API_URL = 'https://catscrudrender.onrender.com';
 
 // Configure axios defaults
 axios.defaults.baseURL = API_URL;
-axios.defaults.headers.post['Content-Type'] = 'application/json';
+axios.defaults.headers.common['Content-Type'] = 'application/json';
+axios.defaults.headers.common['Accept'] = 'application/json';
+axios.defaults.withCredentials = false; // Set this to false since we're making cross-origin requests
 // Fetch all cats
 async function fetchCats() {
     try {
@@ -13,6 +15,14 @@ async function fetchCats() {
         alert('Error fetching cats: ' + (error.response?.data?.detail || error.message));
     }
 }
+
+axios.interceptors.response.use(
+    response => response,
+    error => {
+        console.error('Request Error:', error.response?.data || error.message);
+        return Promise.reject(error);
+    }
+);
 
 // Display cats in table
 function displayCats(cats) {
